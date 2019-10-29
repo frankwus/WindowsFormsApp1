@@ -1,0 +1,75 @@
+﻿Alter  proc [dbo].[usp_ComSearchUser] (@index int,
+@EmployeeID varchar(max),  @FirstName varchar(max), @PermitIssuer varchar(max), @PermitAuthority varchar(max), 
+@Company varchar(max), @LastName varchar(max), @DedicatedBanskman varchar(max), @IsolationAuthority varchar(max) , 
+@Position varchar(max), @Team varchar(max), @GasTester varchar(max), @BarrierAuthority   varchar(max) ,
+@stc varchar(max)=null, 
+@client   varchar(max) =null, 
+@crew   varchar(max) = null,
+ @all int=1
+
+) as 
+
+declare  @s varchar(max) = dbo.fn_paging(0, @index ) 
+
+select 
+'' as ' '
+, employeeId
+, p.id 
+, FirstName as 'First Name'
+, LastName as 'Last Name'
+, l.Name as Position
+, l1.Name as  Company
+, p.FirstName as id1 
+, p.Tour as Tour
+into #t
+from POB p
+left join PobList l on p.Position=l.id and l.Lang='en'
+left join PobList l1 on p.Company=l1.id and l1.Lang='en' 
+where  EmployeeID= ISNULL(@EmployeeID, EmployeeID) 
+and (@FirstName is null or  FirstName like '%'+@FirstName+'%') 
+and (@LastName is null or  LastName like '%'+@LastName+'%') 
+and ( @Company is null or  Company =@Company ) 
+and (@Position is null or Position =@Position ) 
+and ( @Team is null or exists(select * from PobTeam where PobId=p.id and TeamId=@Team) )
+and ( @PermitIssuer is null or @PermitIssuer= dbo.fn_AdminRole(EmployeeID, 'Permit Issuer' ) )
+and ( @PermitAuthority is null or @PermitAuthority= dbo.fn_AdminRole(EmployeeID, 'Permit Authority' ) )
+and ( @DedicatedBanskman is null or @DedicatedBanskman= dbo.fn_AdminRole(EmployeeID, 'Dedicated Banksman' ) )
+and ( @IsolationAuthority is null or @IsolationAuthority= dbo.fn_AdminRole(EmployeeID, 'Isolation Authority' ) )
+and ( @GasTester is null or @GasTester= dbo.fn_AdminRole(EmployeeID, 'Gas Tester' ) )
+and ( @BarrierAuthority is null or @BarrierAuthority= dbo.fn_AdminRole(EmployeeID, 'Barrier Authority' ) )
+and ( @client is null or @client= dbo.fn_AdminRole(EmployeeID, 'client' ) )
+and (@crew is null or p.Crew=@crew) 
+and (@stc is null or @stc=dbo.fn_AdminRole(EmployeeID,'Safety Technician'))
+and (  (  @all !=-1 and ( @all = 1 or  leaveDt is null ) ) 
+	or  ( @all =-1 and CompanyType = (select top 1 id from PobList where type ='companyType' and name='Client' and Lang='en') 
+	and LeaveDt is null ) 
+
+)
+and p.DateofArrival is not null 
+and p.id not in (select * from dbo.fn_ExcludePob() ) 
+--select * from #t return 
+set @s=replace(@s, 'desc', '') 
+--set @s =REPLACE(@s, 'select * from #all'
+--	, 'select '''' as '' ''
+--, ''<a userid=''+employeeId+''  href=../PoB/POB.htm?id=''+ltrim(str(ID)) +''>''+employeeId+''</a>'' as  ID
+--, [First Name]
+--, [Last Name]
+--, Position
+--, Company
+--, (select top 1 name from PobList where id=Tour and lang=''en'') as Tour
+--from #all'
+--) 
+set @s=dbo.fn_ReplacePaging(@s, '
+'''' as '' ''
+, ''<a userid=''+employeeId+''  href=../PoB/POB.htm?id=''+ltrim(str(ID)) +''>''+employeeId+''</a>'' as  ID
+, [First Name]
+, [Last Name]
+, Position
+, Company
+, (select top 1 name from PobList where id=Tour) as Tour
+')
+print @s 
+exec (@s) 
+
+
+
